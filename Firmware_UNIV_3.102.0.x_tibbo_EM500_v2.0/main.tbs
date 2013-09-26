@@ -1,0 +1,336 @@
+include "global.tbh"
+
+public dim overrun_ser as no_yes									'overrun on serial port
+public dim overrun_eth(16) as no_yes								'overrun on eth ports
+public dim workingmode as boolean									'0-single socket mode, 1-multisocket mode 
+public dim sockets_in_use as byte									'number of sockets used in current mode
+public dim pat_canint as no_yes										'pattern can be interrupted flag
+declare SaveSession as string(SessionLEN)	
+
+'-------------------------------------------------------------------------------
+sub on_sys_init
+
+
+dim i, timeout as word
+
+	if stg_start()<>EN_STG_STATUS_OK then
+		if stg_restore_multiple(EN_STG_INIT_MODE_NORMAL)<>EN_STG_STATUS_OK then	
+			pat.play("B-R-R-R-**~",PL_PAT_CANINT)					'patern with 4x speed	
+			h1:	goto h1												'boot_failed
+		end if
+	end if	
+
+'PROTECT web access
+SaveSession=random(SessionLEN)										'get unknown key session to meke sure it's not empty	
+
+'NETWORK from settings
+	net.ip=(stg_get("IP",0))
+	net.gatewayip=stg_get("GI",0)
+	net.netmask=stg_get("NM",0)
+	timeout=val(stg_get("CT",0))*120 								'because CT is in mins, property is in 1/2 sec intervals
+	workingmode=val(stg_get("MO",0)) 								'0-single socket mode, 1-multisocket mode 
+	sock.num=0
+	sock.httpportlist=(stg_get("P0",0))								'http port
+	sock.num=1
+	sock.localportlist=(stg_get("PN",0))
+	sock.num=2
+	sock.localportlist=(stg_get("P2",0))
+	sock.num=3
+	sock.localportlist=(stg_get("P3",0))
+	sock.num=4
+	sock.localportlist=(stg_get("P4",0))
+	sock.num=5
+	sock.localportlist=(stg_get("P5",0))
+	sock.num=6
+	sock.localportlist=(stg_get("P6",0))
+	sock.num=7
+	sock.localportlist=(stg_get("P7",0))
+	sock.num=8
+	sock.localportlist=(stg_get("P8",0))
+	sock.num=9
+	sock.localportlist=(stg_get("P9",0))
+	sock.num=10
+	sock.localportlist=(stg_get("PA",0))
+	sock.num=11
+	sock.localportlist=(stg_get("PB",0))
+	sock.num=12
+	sock.localportlist=(stg_get("PC",0))
+	sock.num=13
+	sock.localportlist=(stg_get("PD",0))
+	sock.num=14
+	sock.localportlist=(stg_get("PE",0))
+	sock.num=15
+	sock.localportlist=(stg_get("PF",0))	
+
+
+'BUFFERS
+	'alocate ethernet port memory - http socket
+	sock.num=0
+	sock.txbuffrq(2)
+	sock.rxbuffrq(2)
+	sock.varbuffrq(1)
+
+	if workingmode=0 then
+	'single socket mode
+		sockets_in_use=1
+		
+		'allocate serial port memory
+		ser.num=0
+		i=sys.freebuffpages	- 5											'how many buffers available minus 5 for http socket
+		ser.txbuffrq(i/2)
+		
+		'alocate ethernet port memory - com socket
+		sock.num=1
+		sock.txbuffrq(i/2)
+		sys.buffalloc		
+		ser.redir(PL_REDIR_SOCK1)										'serial RX redirect to socket 1 TX
+		sock.redir(PL_REDIR_SER)										'socket 1 RX redirect to serial TX
+	
+	else
+	'multisocket mode
+		sockets_in_use=15
+		
+		'allocate serial port memory
+		ser.num=0
+		ser.txbuffrq(2)
+		ser.rxbuffrq(sys.freebuffpages-23)								'how many buffers available minus 5 for http socket, 2 for ser tx i 16x1 for eth tx
+	
+		'alocate ethernet port memory - com socket
+		for i=1 to sockets_in_use			
+			sock.num=i
+			sock.txbuffrq(1)
+			sock.redir(PL_REDIR_SER)									'redirect socket Rx buffer directly to serial Tx buffer
+		next i
+		sys.buffalloc
+		
+	end if
+	
+	
+	for i=0 to sockets_in_use
+		overrun_eth(i)=NO
+	next i		
+		overrun_ser=NO
+
+		
+'ETHERNET PORT CFG
+	'http socket
+	sock.num=0
+	sock.connectiontout=timeout
+	sock.allowedinterfaces="NET"
+	sock.protocol=PL_SOCK_PROTOCOL_TCP	
+	sock.inconmode=PL_SOCK_INCONMODE_ANY_IP_ANY_PORT
+	sock.reconmode= PL_SOCK_RECONMODE_0
+
+	'com socket
+	for i=1 to sockets_in_use
+		sock.num=i
+		sock.connectiontout=timeout	
+		sock.allowedinterfaces="NET"		
+		sock.protocol= PL_SOCK_PROTOCOL_TCP
+		sock.inconmode= PL_SOCK_INCONMODE_ANY_IP_ANY_PORT
+		sock.reconmode= PL_SOCK_RECONMODE_2							'reconets from same IP any port
+	next i
+
+'SERIAL CFG
+	ser.baudrate=ser.div9600/(115200/9600)
+	ser.bits=PL_SER_BB_8
+	ser.parity=PL_SER_PR_NONE
+	ser.interface=PL_SER_SI_FULLDUPLEX
+	ser.enabled=YES
+	
+	
+'OTHER
+	quick_init_flag=QI_NULL											'quick init flag
+	
+	pat_canint=NO 													'this way the pattern below will not be interrupted by sock event	
+		pat.channel=0
+	pat.play(PAT_THREE_BOTH_ONCE, PL_PAT_CANINT)
+
+
+end sub
+
+
+'-------------------------------------------------------------------------------
+sub On_ser_data_arrival
+
+	dim i as integer
+	dim data as string
+	dim datalen as word
+	dim connection as boolean
+	
+	'if no socket connected
+	connection = false
+		for i=1 to sockets_in_use
+			sock.num=i
+			if (sock.statesimple = PL_SSTS_EST) then				'check every sockets if connected
+				connection = true
+			end if
+		next i			
+	if connection = false then										'if no socket connected then
+		ser.rxclear													'clear serial buffer
+		exit sub													'and exit subroutine
+	end if	
+
+
+	'find sock tx buffer with lowest memory available at the moment in its tx buffer
+	datalen = &hFFFF												'the max length for this variable
+	for i=1 to sockets_in_use
+		sock.num=i
+		if (sock.statesimple = PL_SSTS_EST) then					'check only sockets with established connection
+			if (datalen > sock.txfree) then
+				datalen = sock.txfree								'choose the lowest memory
+			end if
+		end if
+	next i
+
+
+	'take maximum data and send to each established socket
+	if (datalen>0) then
+		data = ser.getdata(datalen)									'take from serial buffer
+		for i=1 to sockets_in_use
+			sock.num=i
+			if (sock.statesimple = PL_SSTS_EST) then				'check only sockets with established connection
+				sock.setdata(data)
+				sock.send
+			end if	
+		next i	
+	end if
+	
+end sub
+
+
+'-------------------------------------------------------------------------------
+sub on_sock_event(newstate as pl_sock_state, newstatesimple as pl_sock_state_simple)
+
+	pat.play(PAT_GAP,pat_canint)									'to keep access to on_pat() 
+
+	if html_reboot_flag = YES then 
+		sys.reboot
+	end if
+
+end sub
+
+'-------------------------------------------------------------------------------
+sub on_pat()
+
+	dim i as integer
+	pat_canint=YES													'patter that shouldn't have been interrupted just finished playing	
+
+'quick init pattern
+	if quick_init_flag<>QI_NULL then
+		select case quick_init_flag
+		case QI_START:
+			pat.play(PAT_BLINK_BOTH_IN_TURNS,PL_PAT_CANINT)
+		case QI_OK:
+			pat.play(PAT_LONG_GREEN,PL_PAT_CANINT)
+			quick_init_flag=QI_END
+		case QI_NG:
+			pat.play(PAT_LONG_RED,PL_PAT_CANINT)
+			quick_init_flag=QI_END
+		case QI_END:
+			sys.reboot			
+		end select
+		exit sub
+	end if
+
+'ethernet pattern
+	for i=0 to sockets_in_use
+		sock.num=i
+		select case sock.statesimple
+		case PL_SSTS_CLOSED, PL_SSTS_PC, PL_SSTS_AC:				'no connection at this time
+			select case sock.state
+			case PL_SST_CL_PRESET_POPENING,							'connection was reset by the other end
+				 PL_SST_CL_PRESET_AOPENING,
+				 PL_SST_CL_PRESET_EST,
+				 PL_SST_CL_PRESET_PCLOSING,
+				 PL_SST_CL_PRESET_ACLOSING,
+				 PL_SST_CL_PRESET_STRANGE:
+				 pat.play(PAT_THREE_SHORT_RED,PL_PAT_CANINT)
+			case else:												'idle (and not because it was reset by other end)
+				 pat.play(PAT_TWO_SHORT_GREEN,PL_PAT_CANINT)
+			end select
+			
+		case PL_SSTS_PO, PL_SSTS_AO:
+			pat.play(PAT_THREE_SHORT_GREEN,PL_PAT_CANINT)
+		
+		case PL_SSTS_EST:
+			pat.play(PAT_GREEN_LOOP,PL_PAT_CANINT) 		
+			exit sub												'exit if one connection is established
+		end select
+	next i			
+
+end sub
+
+'-------------------------------------------------------------------------------
+sub on_sys_timer()
+
+	dim i as integer
+
+	for i=0 to sockets_in_use
+		sock.num=i
+		if sock.statesimple=PL_SSTS_EST and sock.toutcounter=0 then	'socket in use?
+			pat.play(PAT_GAP,pat_canint)							'so, short blink
+			exit sub												'exit if one connection is established
+		end if
+	next i
+	
+end sub
+
+'-------------------------------------------------------------------------------
+sub on_sock_overrun()
+	dim i as byte
+	
+	for i=0 to sockets_in_use
+		if i=sock.num then
+			overrun_eth(i)=YES										'put overrun flag on particular socket
+		end if
+	next i
+end sub
+
+'-------------------------------------------------------------------------------
+sub on_ser_overrun()
+	overrun_ser=YES
+end sub
+
+'-------------------------------------------------------------------------------
+sub on_button_pressed()												'reset to factory settings
+
+	dim stg_op_result as en_stg_status_codes
+	dim i,j as word
+
+	if quick_init_flag=QI_NULL then
+		quick_init_flag=QI_START
+		
+	else
+		'init already started
+		'now, button has to be kept released for a while first
+		if button.time<10 then exit sub
+		
+		'now we need to wait for a while -- the button must be "long-pressed"
+		i=sys.timercount
+		while button.pressed=YES
+			j=sys.timercount
+			'the code below takes into the account that the sys.timercount can wrap around
+			if j>=i then
+				if j-i>=BUTTON_CONST_QUICK_INIT then
+					goto initialize
+				end if
+			else
+				if  (65536-i)+j>=BUTTON_CONST_QUICK_INIT then
+initialize:			'OK, initialize now!
+					pat.play(PAT_GAP,PL_PAT_CANINT)
+					if stg_restore_multiple(EN_STG_INIT_MODE_OVERRIDE)<>EN_STG_STATUS_OK then
+						quick_init_flag=QI_NG
+					else
+						quick_init_flag=QI_OK
+					end if	
+					exit sub
+				end if
+			end if
+			doevents 
+		wend
+	end if
+end sub
+
+'-------------------------------------------------------------------------------
+

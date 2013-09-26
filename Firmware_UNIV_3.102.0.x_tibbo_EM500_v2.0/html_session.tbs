@@ -1,0 +1,9 @@
+include "global.tbh"
+
+public dim html_login_message as html_login_messages
+
+dim login_counter as word
+
+
+
+

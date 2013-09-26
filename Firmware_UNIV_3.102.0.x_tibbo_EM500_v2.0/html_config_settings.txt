@@ -1,0 +1,21 @@
+bit0	multi-port configuration
+bit1	multi-channel configuration
+bit2	Power on pin 9 available
+bit3	Wi-Fi available
+bit4	GPRS available
+bit5	serial port modes are 232, 485, and 422
+bit6	serial port modes are full-duplex and half-duples
+bit7	multi-channel RS232/422/485 configuration
+bit8	have 2 serial ports
+bit9	have 3 serial ports
+bit10	have 4 serial ports
+
+bits09876543210
+
+>>&b00000000000	PW	Login Password					S,I,6	^
+>>&b00000000000	ON	Owner Name						S,I,8	^
+>>&b00000000000	DN	Device Name 					S,I,8	^
+>>&b00000000000	IP	IP-address 						S,I,15	^
+>>&b00000000000	GI	Gateway IP-address 				S,I,15	^
+>>&b00000000000	NM	Subnet Mask						S,I,15	^
+

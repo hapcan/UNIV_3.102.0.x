@@ -1,0 +1,30 @@
+bit0	multi-port configuration
+bit1	multi-channel configuration
+bit2	Power on pin 9 available
+bit3	Wi-Fi available
+bit4	GPRS available
+bit5	serial port modes are 232, 485, and 422
+bit6	serial port modes are full-duplex and half-duples
+bit7	serial port supports baudrates up to 115200	
+bit8	serial port supports all baudrates
+
+bits876543210
+
+>>&b000000000	CT	Connection Timeout								S,I,2	^
+>>&b000000000	MO	Working Mode 									B,L,0-Single Socket Mode;1-Multi Socket Mode;	^
+>>&b000000000	P0	Web Port										S,I,5	^
+>>&b000000000	PN	Port of Socket 1								S,I,5	^
+>>&b000000000	P2	Port of Socket 2								S,I,5	^
+>>&b000000000	P3	Port of Socket 3								S,I,5	^
+>>&b000000000	P4	Port of Socket 4								S,I,5	^
+>>&b000000000	P5	Port of Socket 5								S,I,5	^
+>>&b000000000	P6	Port of Socket 6								S,I,5	^
+>>&b000000000	P7	Port of Socket 7								S,I,5	^
+>>&b000000000	P8	Port of Socket 8								S,I,5	^
+>>&b000000000	P9	Port of Socket 9								S,I,5	^
+>>&b000000000	PA	Port of Socket 10								S,I,5	^
+>>&b000000000	PB	Port of Socket 11								S,I,5	^
+>>&b000000000	PC	Port of Socket 12								S,I,5	^
+>>&b000000000	PD	Port of Socket 13								S,I,5	^
+>>&b000000000	PE	Port of Socket 14								S,I,5	^
+>>&b000000000	PF	Port of Socket 15								S,I,5	^

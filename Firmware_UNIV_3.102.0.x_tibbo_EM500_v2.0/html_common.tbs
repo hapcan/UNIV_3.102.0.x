@@ -1,0 +1,274 @@
+include "global.tbh"
+
+public dim html_reboot_flag as no_yes
+public dim html_login_message as html_login_messages
+public dim SessionID, SaveSession as string(SessionLEN)	
+
+
+'=============================================================
+public sub html_print_session 
+'get the session number from URL and add it to the html page as an input, so it would be passed on.
+	dim s as string
+	s = get_http_argument(sock.httprqstring,"session=")
+	sock_setsend("<input type = 'hidden' name = 'session' value = '"+s+"'>")
+end sub
+
+'=============================================================
+public function password_verify as ok_ng
+'Check the password.  If the password is correct, proceed to the next page (home.html), otherwise, redirect back to index page
+	
+	dim pw as string(6)
+	dim entered_pw as string(6)
+	dim stg_status as en_stg_status_codes
+	dim i as byte
+	
+	entered_pw = get_http_argument(sock.httprqstring,"pw=")
+	stg_status = stg_sg("PW",0,pw,EN_STG_GET)
+
+	if entered_pw = pw then
+		password_verify=OK
+		'generate session key
+		SaveSession = random(SessionLEN)
+		SessionID=""
+		for i = 1 to SessionLEN	'change string to nice digits and make it string again
+			SessionID = SessionID + str(asc( mid(SaveSession,i,1)) mod 9)
+		next i
+		SaveSession = SessionID
+	else
+		password_verify=NG
+		html_login_message = HLM_INVALID_PASSWORD
+	end if
+end function
+
+'=============================================================
+public function html_login_verify(print_redir as no_yes) as ok_ng
+'Check if there are currently logged user by varifing the session ID.
+	
+	dim httparg as string(SessionLEN)
+	httparg = get_http_argument(sock.httprqstring,"session=")
+
+	if SaveSession <> httparg then 
+		html_login_message = HLM_INVALID_SESSION
+		if print_redir = YES then sock_setsend("onload = IndexPage()") 
+			html_login_verify = NG
+		exit function
+	end if
+	html_login_verify = OK
+	
+end function
+
+'=============================================================
+public sub print_login_state
+'check current login (error) message and print the error msg on the index.html accordingly
+	select case html_login_message
+		case HLM_LOGGED_OUT:
+			sock_setsend(HTML_LOGGED_OUT)
+		
+		case HLM_INVALID_PASSWORD:
+			sock_setsend(HTML_INVALID_LOGIN)
+		
+		case HLM_INVALID_SESSION:
+			sock_setsend(HTML_INVALID_SESSION)
+			
+		case HLM_PRIORITY_REJECTED:
+			sock_setsend(HTML_NO_PRIORITY)
+	
+		case HLM_NOT_LOGGED_IN
+			sock_setsend(HTML_NOT_LOGGED_IN)
+	end select
+	html_login_message = HLM_NONE
+end sub
+
+'=============================================================
+public sub print_routing_data(channel_num as byte, fragment_num as print_routing_data_fragments)
+	
+	dim print_str as string(100)
+	dim i as word
+	dim sock_num_backup as byte
+
+	sock_num_backup=sock.num
+	sock.num=channel_num
+	ser.num=0
+	print_str=""
+
+	select case fragment_num
+	
+	case PRD_SRX:  'Serial RX (data/capacity)
+		if overrun_ser<>NO then print_str=print_str+"<font color='red'>"
+		print_str=print_str+str(ser.rxlen)+"/"+str(ser.rxbuffsize)
+		if overrun_ser<>NO then print_str=print_str+" (overrun)</font>"
+
+	case PRD_STX:  'Serial TX (data/capacity)
+		print_str=print_str+str(ser.txlen)+"/"+str(ser.txbuffsize)
+
+	case PRD_ERX:  'Ethernet RX (data/capacity)
+		if overrun_eth(channel_num)<>NO then print_str=print_str+"<font color='red'>"
+		print_str=print_str+str(sock.rxlen)+"/"+str(sock.rxbuffsize)
+		if overrun_eth(channel_num)<>NO then print_str=print_str+" (overrun)</font>"
+
+	case PRD_ETX:  'Ethernet TX (data/capacity)
+		print_str=print_str+str(sock.txlen)+"/"+str(sock.txbuffsize)
+
+
+	case PRD_NI: 'Network Interface
+		print_str="Socket "+str(sock.num)
+			
+	case PRD_CS:  'Connection State
+		select case sock.statesimple
+		case PL_SSTS_CLOSED, PL_SSTS_PC, PL_SSTS_AC:
+			'no connection at this time
+			select case sock.state
+			case PL_SST_CL_PRESET_POPENING,
+				 PL_SST_CL_PRESET_AOPENING,
+				 PL_SST_CL_PRESET_EST,
+				 PL_SST_CL_PRESET_PCLOSING,
+				 PL_SST_CL_PRESET_ACLOSING,
+				 PL_SST_CL_PRESET_STRANGE:
+				'connection was reset by the other end
+				print_str="Reset (by remote host)"
+			case else:
+				'idle (and not because it was reset by other end)
+				print_str="Idle"
+			end select
+
+		case PL_SSTS_ARP, PL_SSTS_PO, PL_SSTS_AO:
+			'connection is being established
+			print_str="Opening"
+		
+		case PL_SSTS_EST:
+			print_str="Established"
+		end select
+
+	case PRD_LP:  'Local Port
+		print_str=str(sock.localport)
+
+	case PRD_RI:  'Remote IP
+		print_str=sock.remoteip
+
+	case PRD_RP:  'Remote Port
+		print_str=str(sock.remoteport)
+
+		end select
+	
+
+	sock.num=sock_num_backup
+	sock_setsend(print_str)
+end sub
+
+
+'=============================================================
+public sub html_proc_cmd
+	dim s as string
+
+	s = get_http_argument(sock.httprqstring,"opt=")
+	Select case s
+
+		case "logout":
+			SaveSession=random(SessionLEN)			'get unknown key session to meke sure it's not empty
+			sock_setsend("onload = IndexPage()")
+			html_login_message = HLM_LOGGED_OUT
+			
+		case "init":
+			proc_device_op("I")
+			html_reboot_flag = YES
+			sock_setsend("onload = IndexPage()")
+		
+		case "reboot":
+			html_reboot_flag = YES
+			sock_setsend("onload = IndexPage()")
+	end select
+end sub
+
+'=============================================================
+public sub sock_setsend(byref s as string)
+'Making sure the tx buffer is free before adding more data to the buffer.
+	dim f as byte
+	
+	while sock.txfree<len(s)
+		if sock.statesimple<>PL_SSTS_EST then 
+			sock.txclear
+			exit sub
+		end if
+	wend
+	sock.setdata(s)
+	sock.send
+end sub
+
+'=============================================================
+public function get_http_argument(byref http_req_string as string, byref argument as string) as string
+'Get one specific argument from the http request string.
+'For example If http_req_string = http://index.html&p1=abc&p2=def by calling this function, 
+'get_http_argument(sock.httprqstring,"p1="), the function returns "abc"
+	dim x, y as byte
+	x = instr(1, http_req_string, argument,1)
+	if (x = 0) then
+		get_http_argument = ""
+		exit function
+	end if
+	x = x + len(argument)
+	y = instr(x, http_req_string, "&",1)
+	if (y = 0) then
+		y = instr(x, http_req_string, " ",1)
+		if (y = 0) then
+			y = len(argument)
+		end if
+	end if
+	get_http_argument = mid(http_req_string, x, y - x)
+end function
+
+'=============================================================
+public function mod_http_argument(byref http_req_string as string, byref argument as string, byref arg_val as string) as string
+'modify the value of argument in the http_req_string, if the argument doesn't exist, add it the end of http_req_string 
+	dim pos1, pos2 as byte
+	dim s,s1 as string
+	'empty http_req_string
+	if http_req_string = "" then 
+		mod_http_argument = "?"+argument+"="+arg_val
+		exit function
+	end if
+	'remove the tailing infor
+	pos1 = instr(1,http_req_string," HTTP",1)
+	http_req_string = left(http_req_string,pos1-1)
+	
+	'find the argument
+	pos1 = instr(1,http_req_string,argument,1)
+	
+	'if the argument already exit, modify the value to arg_val, else add it to the end of http_req_string
+	if pos1 > 0 then 
+		pos1 = pos1+len(argument)-1
+		pos2 = instr(1,http_req_string,"?",1)
+		if pos2 > 0 then http_req_string = right(http_req_string,len(http_req_string)-pos2)
+		s = "?"+left(http_req_string,pos1)+"="+arg_val
+		
+		'the argument could be in the middle to the http_req_string
+		pos2 = instr(pos1,http_req_string,"&",1)
+		if pos2 > 0 then
+			s = s+right(http_req_string,len(http_req_string)-pos2+1)
+			mod_http_argument = s
+			exit function
+		else
+			mod_http_argument = s
+			exit function
+		end if
+	else
+		mod_http_argument = "?"+http_req_string+"&"+argument+"="+arg_val
+	end if
+end function
+
+'=============================================================
+public sub html_spec_chr_convert(byref http_req_string as string)
+	dim char_ascii as string(2)
+	dim char_str as string(1)
+	dim pos1, pos2 as byte
+	dim temp1, temp2 as string
+	do 
+		pos1 = instr(1,http_req_string,"%",1) 
+		if pos1 > 0 then
+			char_ascii = mid(http_req_string,pos1+1,2)
+			char_str = chr("&h"+char_ascii)
+			temp1 = left(http_req_string,pos1-1)
+			temp2 = right(http_req_string,len(http_req_string)-pos1-2)
+			http_req_string = temp1 + char_str + temp2
+		end if	
+	loop while pos1 > 0
+end sub

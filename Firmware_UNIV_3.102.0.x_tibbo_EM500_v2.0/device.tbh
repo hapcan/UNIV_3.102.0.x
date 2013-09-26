@@ -1,0 +1,48 @@
+
+
+'=============================================================================
+
+
+const BUTTON_CONST_QUICK_INIT=5 'in 0.5 intervals -- how long you need to press button for quick init
+
+
+const PAT_ONE_SHORT_GREEN=			"---------------G"
+const PAT_BOTH_LOOP=				"B~"
+const PAT_GREEN_LOOP=				"G~"
+const PAT_TWO_SHORT_RED=			"-----RRRRRR--R-R"
+const PAT_THREE_SHORT_RED=			"-----------R-R-R"
+const PAT_TWO_SHORT_GREEN=			"-------------G-G"
+const PAT_THREE_SHORT_GREEN=		"-----------G-G-G"
+const PAT_BLINK_BOTH_IN_TURNS_FAST=	"GRGRGRGR**"
+const PAT_BLINK_BOTH_TOGETHER_FAST=	"B-B-B-B-**~"
+const PAT_THREE_BOTH_ONCE=			"--B-B-B--"
+const PAT_BLINK_BOTH_IN_TURNS=		"RG"
+const PAT_BLINK_RED_SLOW=			"--RR"
+const PAT_GREEN_ON=					"G"
+const PAT_BOTH_ON=					"B"
+const PAT_GREEN_GAP=				"-GGGG**"
+const PAT_RED_ON_GREEN_GAP=			"RBBBB**"
+const PAT_BLINK_GREEN=				"-G"
+const PAT_GAP=						"-**"
+const PAT_LONG_GREEN=				"GGGGGGGG-"
+const PAT_LONG_RED=					"RRRRRRRR-"
+const BEEP_LONG=					"BBBBBB"
+const BEEP_SHORT=					"BB"
+
+
+enum quick_init_states
+	QI_NULL,
+	QI_START,
+	QI_OK,
+	QI_NG,
+	QI_END
+end enum
+
+
+declare quick_init_flag as quick_init_states
+
+
+declare function proc_device_op(s as string(1)) as string(1)
+declare sub device_setting_set(sname as string(STG_MAX_SETTING_NAME_LEN), index as byte, s as string)
+declare function device_setting_check(byref setting_name as string,byref setting_val as string) as ok_ng
+declare function device_spec_arg_sg(byref setting_name as string, byref setting_val as string, byref stg_num as byte, rw as en_stg_rdwr) as en_stg_status_codes
