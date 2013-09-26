@@ -1,0 +1,27 @@
+bit0	multi-port configuration
+bit1	multi-channel configuration
+bit2	Power on pin 9 available
+bit3	Wi-Fi available
+bit4	GPRS available
+bit5	serial port modes are 232, 485, and 422
+bit6	serial port modes are full-duplex and half-duples
+bit7	multi-channel RS232/422/485 configuration
+bit8	have 2 serial ports
+bit9	have 3 serial ports
+bit10	have 4 serial ports
+
+bits09876543210
+
+>>&b00000000000	PW	Login Password					S,I,6	^
+>>&b00000000000	ON	Owner Name						S,I,8	^
+>>&b00000000000	DN	Device Name 					S,I,8	^
+>>&b00000000000	DH	DHCP							B,L,0-Disabled;1-Enabled;	^
+>>&b00000000000	IP	IP-address 						S,I,15	^
+>>&b00000000000	GI	Gateway IP-address 				S,I,15	^
+>>&b00000000000	NM	Subnet Mask						S,I,15	^
+>>&b00100000001	PC	Number of Serial Ports in Use	B,L,0-One port;1-Two ports;	^
+>>&b01000000001	PC	Number of Serial Ports in Use	B,L,0-One port;1-Two ports;2-Three ports;	^
+>>&b10000000001	PC	Number of Serial Ports in Use	B,L,0-One port;1-Two ports;2-Three ports;3-Four ports;	^
+>>&b00000000010	PC	Serial Port Configuration		B,L,0-Option 0;1-Option 1;2-Option 2;3-Option 3;4-Option 4;5-Option 5;6-Option 6;7-Option 7;8-Option 8;9-Option 9;10-Option 10;11-Option 11;12-Option 12;13-Option 13;14-Option 14;	^
+>>&b00010000000	PC	Serial Port Configuration		B,L,0-Option 0;1-Option 1;2-Option 2;3-Option 3;4-Option 4;5-Option 5;6-Option 6;7-Option 7;8-Option 8;9-Option 9;10-Option 10;11-Option 11;12-Option 12;13-Option 13;14-Option 14;15-Option 15;16-Option 16;17-Option 17;	^
+>>&b00000000100	PS	Power on Pin 9					B,L,0-Off;1-On;	^
