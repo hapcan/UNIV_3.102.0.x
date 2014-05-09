@@ -1,0 +1,124 @@
+<?
+	include "global.tbh"
+	dim flag as ok_ng
+?>
+
+<html>
+<HEAD>
+<META HTTP-EQUIV="Expires" CONTENT="Tue, 01 Jan 1980 1:00:00 GMT">
+<META HTTP-EQUIV="CACHE-CONTROL" CONTENT="NO-CACHE">
+
+<script type="text/javascript">
+function FormSubmit()
+{
+	alert("Please reboot after saving");
+	document.getElementById("myForm").submit()
+}
+function IndexPage()
+{
+	window.top.location.replace("Index.html")
+}
+
+</script>
+
+<style type="text/css">
+body{
+   background-color: #FFFFFF;}
+
+h1,h2,h3,hr{
+   color: #808080;
+   font-family: arial, 'sans serif';    
+   text-align:center;}
+
+table{
+   border:0px;
+   border-spacing: 1px;
+   border-collapse: separate;    
+   font-family: arial, 'sans serif';}
+   
+table.settings{
+   border:0px;
+   border-spacing: 1px;
+   border-collapse: separate;   
+   font-family: arial, 'sans serif';
+   background-color:#EEEEEE; 
+   color: #404040;}   
+
+table.header{
+   border:0px;
+   border-spacing: 1px;
+   border-collapse: separate;  
+   text-align:center;
+   font-family: arial, 'sans serif';
+   background-color:#808080;
+   color: #FFFFFF;} 
+     
+a{
+   float:left;
+   text-decoration:none;
+   color:#FFFFFF;
+   background-color:#FF801C;
+   padding:0.2em 0.6em;}
+
+a:hover {
+   background-color:#808080;}
+   
+</style>
+</HEAD>
+
+<body <?flag=html_login_verify(yes)?>>
+<? 
+	if flag=NG then goto finish
+?>
+<div>
+<?html_save_setting?>
+<br>
+	<table width='600' align=center>
+		<form id="myForm" action="port.html?" method="get">
+		<? html_print_session?>	
+		<tr><td width = 80%> <h3> Connection Settings</h3> </td>
+		</tr>
+		<tr>
+		</tr>
+		<tr>
+			<td width = 80%>
+			<table class = 'header' width= 100%>
+				<tr>
+					<td	width = 66%><b>Setting name</b></td>
+					<td width = 34%><b>Setting value</b></td>
+				</tr>
+			</table>		
+			</td>
+			<td>
+			</td>
+		</tr>
+
+		<? 
+		workingmode=val(stg_get("MO",0)) 								'0-single socket mode, 1-multisocket mode
+		if workingmode=0 then
+			html_print_setting("html_config_port1.txt",0) 
+		else
+			html_print_setting("html_config_port15.txt",0) 
+		end if	
+		?>
+		<tr>
+		<td width = 80%>
+			<table width = 100%>
+				<tr><td><table>
+					<tr><td><a href = '#' onclick='FormSubmit()'> Save </a></td>
+					 	<td><a href = 'port.html?session=<?sock_setsend(SessionID)?>'> Reload </a></td>
+						<td width = 100% align = right>
+						</td>
+					</tr></table>
+					</td>
+				</tr>
+			</table>
+		</td>
+		</tr>
+		</form>
+	</table>
+</div>
+<?finish: ?>
+
+</body>
+</html>

@@ -1,0 +1,47 @@
+
+enum print_routing_data_fragments
+	PRD_SRX,
+	PRD_STX,
+	PRD_ERX,
+	PRD_ETX,	
+	PRD_RI,
+	PRD_RP,
+	PRD_NI,
+	PRD_CS,
+	PRD_LP
+end enum
+
+
+enum html_login_messages
+	HLM_NONE,
+	HLM_LOGGED_OUT,
+	HLM_INVALID_PASSWORD,
+	HLM_INVALID_SESSION,
+	HLM_PRIORITY_REJECTED,
+	HLM_NOT_LOGGED_IN
+end enum
+
+'CONST HTML_CONFIRM_LOG_OFF = "Would you like to log out?"
+'CONST HTML_CONFIRM_INITIALIZE = "Would you like to initialize the device? \\nSome of the settings will only be effective after reboot!"
+'CONST HTML_CONFIRM_REBOOT = "Would you like to reboot the device? \\nIP address of the device might change after reboot!"
+'CONST HTML_LOGGED_OUT = "<b>Logged out.</b>"
+'CONST HTML_INVALID_LOGIN = "<b>Invalid password. Please try again.</b>"
+'CONST HTML_INVALID_SESSION = "<b>Invalid session ID, or other user is currently logged in, please log in again.</b>"
+'CONST HTML_NO_PRIORITY = "<b>Another user is currently logged in from a client with higher priority.</b>"
+'CONST HTML_NOT_LOGGED_IN = "<b>You are not logged in. This could be because your login session has expired OR because another session with higher priority has started</b>"
+
+declare html_login_message as html_login_messages
+declare overrun_ser as no_yes											'overrun on serial port
+declare overrun_eth(16) as no_yes										'overrun on eth ports
+
+
+declare sub html_print_session
+declare function password_verify as ok_ng
+declare function html_login_verify(print_redir as no_yes) as ok_ng
+declare sub print_login_state
+declare sub print_routing_data(channel_num as byte, fragment_num as print_routing_data_fragments)
+declare sub html_proc_cmd
+declare sub sock_setsend(byref s as string)
+declare function get_http_argument(byref http_req_string as string, byref argument as string) as string
+declare function mod_http_argument(byref http_req_string as string, byref argument as string, byref arg_val as string) as string
+declare sub html_spec_chr_convert(byref http_req_string as string)

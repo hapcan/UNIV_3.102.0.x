@@ -1,0 +1,151 @@
+
+'***********************************************************************************************************
+'			THIS DNS CODE WILL OBTAIN IP FROM DOMAIN NAME SERVER
+'***********************************************************************************************************
+'The IP Address for the DNS server should be stored in sNameServerIP before calling InitDNS (sNameServerIP = ...)
+'The InitDNS should be called from on_sys_init event. It connects to the appointted name server. 
+'Use Query("your.domain.name") to send the query and then use ExtractFromRXBuff() to see the result of 
+'query. If result is 0 which means the query was successful, use ConvertToIPString(bIndex as byte) to get the
+'IP address 
+'Noted: more than 1 ip address can be mapped to 1 domain name, user can use bAnsCount to see how many IP
+'addresses were aquired, and get different ip address by using different bIndex. 
+'***********************************************************************************************************
+include "DNS.tbh"
+
+const DNSSOCK = "15"			'<------------------- sock number for DNS, change this according to your program
+public dim sNameServerIP as string	'Name Server IP
+dim wID as word
+dim sOPCode as string(4)	'0 = standard query, 1 = inverse query, 2 = server status request
+dim sRD as string(1) 	'recursion desired
+dim wQDCount as word		'number of questions
+dim wQType as word		'query type 
+dim wQClass as word		'query class
+public dim bAnsCount as byte    'number of answers
+
+
+'query type
+'+-------+---------------+
+'| Value | Description   |
+'+-------+---------------+
+'|   1   |  IP Address   |
+'|   2   | Name Server   |
+'|   5   |Canonical name |
+'|  12   |pointer record | 
+'|  13   |host info      |
+'|  15   |mail exchange  |
+'+-------+---------------+
+
+
+dim sQuestion as string		'the question(domain name) in DNS format
+dim sIPString as string		'contains all ip addresses mapped to the domain name in question.
+'---------------------------------------------------------------------------------------
+'Extract IPs from the response strings in the sock rx buffer, and store all IPs in the sIPString
+'Also return the result of the query.
+public function ExtractFromRXBuff as byte
+	dim bPos as byte
+	dim i as byte
+	dim sIPStart as string
+	dim sTemp as string
+	dim bFlag as byte
+	dim bRCode as byte
+	dim sAns1 as string
+	dim sAns2 as string
+	dim sTempIP as string
+	sock.num = val(DNSSOCK) 
+	sAns1 = sock.getdata(255)
+	sAns2 = sock.getdata(255)	'the response string is longer than 255 
+	sock.close	
+	sIPStart = chr(0) + chr(1) + chr(0) + chr(1) '0001 0001 IP Address Answer
+	bPos = instr(1,sAns1,sQuestion,1)		'the position of the question(Domain Name) in the respond packet    
+	bAnsCount = asc(mid(sAns1,bPos-5,1))		'the number of answers 
+	bFlag = asc(mid(sAns1,bPos-9,1))			'extracting the query result "RCode" from the flag
+	bRCode = val("&b" + right(bin(bFlag),4))	
+	bPos = bPos + len(sQuestion) + 5			
+	'bPos = instr(bPos,sAns1,sIPStart,1)  		'the position of first IP Address Answer
+	if len(sAns2) > 0 then
+		sTemp = right(sAns1,len(sAns1)-bPos) + left(sAns2,bPos)  'locating the part of response that contains IPs
+	else
+		sTemp = right(sAns1,len(sAns1)-bPos)
+	end if
+	for i = 1 to bAnsCount
+		dim sIP as string
+		dim bIPLen as byte
+		bPos = instr(1,sTemp,sIPStart,i) + 9
+		bIPLen = asc(mid(sTemp,bPos,1))
+		sTempIP = sTempIP + str(i) + ":" + mid(sTemp,bPos,bIPLen + 1)
+	next i
+	sIPString = sTempIP 	
+	ExtractFromRXBuff = str(bRCode)		'bRCode: 0:no error, 2:server fail, 3:name error
+end function
+'---------------------------------------------------------------------------------------
+'initialize DNS connection, and set the default value
+public sub InitDNS
+	wID = 1
+	sOPCode = "0000"	
+	sRD = "1"
+	wQDCount = 1
+	wQType = 1
+	wQClass = 1
+	sock.num = val(DNSSOCK)
+	sock.txbuffrq(1)
+	sock.rxbuffrq(2)
+	sys.buffalloc
+	sock.protocol = PL_SOCK_PROTOCOL_UDP
+	sock.inconmode = PL_SOCK_INCONMODE_ANY_IP_ANY_PORT
+	sock.reconmode=PL_SOCK_RECONMODE_3
+	sock.targetip = sNameServerIP
+	sock.targetport = 53
+	sock.connect
+end sub
+'---------------------------------------------------------------------------------------
+'convert sTemp into binary string, padding the 0 and add to the sDNSQuery string
+function BinaryConverter(sTemp as string, sDNSQuery as string) as string
+	sTemp = right(sTemp,len(sTemp) - 2)
+	do while len(sTemp) < 16
+		sTemp = "0" + sTemp
+	loop	
+	BinaryConverter = sDNSQuery + chr(val("&b"+ left(sTemp,8))) + chr(val("&b"+ right(sTemp,8)))
+end function
+'---------------------------------------------------------------------------------------
+'form the DNS query string and send the query to DNS server
+public function DNSQuery(sQueryName as string) as string
+	dim sDNSQuery as string
+	dim sQFlag as string
+	dim i as byte
+	dim sTemp as string
+		sDNSQuery = BinaryConverter(bin(wID),sDNSQuery)
+		sQFlag = "0"+ sOPCode + "00" + sRD + "00000000"	
+		sDNSQuery = sDNSQuery + chr(val("&b"+ left(sQFlag,8))) + chr(val("&b"+ right(sQFlag,8)))
+		sDNSQuery = BinaryConverter(bin(wQDCount),sDNSQuery)
+		sDNSQuery = sDNSQuery + chr(0) + chr(0) + chr(0) + chr(0) + chr(0) + chr (0)
+		sQueryName = sQueryName + "."
+		do while instr(1,sQueryName,".",1) > 0 
+			dim bPos as byte
+			bPos = instr(1,sQueryName,".",1)
+			sTemp = sTemp + chr(bPos-1) + left(sQueryName, bPos-1)
+			sQueryName = right(sQueryName, len(sQueryName)-bPos)
+		loop
+		sQuestion = sTemp
+		sDNSQuery = sDNSQuery + sQuestion + chr(0)
+		sDNSQuery = BinaryConverter(bin(wQType),sDNSQuery)
+		sDNSQuery = BinaryConverter(bin(wQClass),sDNSQuery)
+		sock.num = val(DNSSOCK)
+		sock.setdata(sDNSQuery)
+		sock.send
+		DNSQuery = sDNSQuery
+end function 
+'---------------------------------------------------------------------------------------
+'return the IP address according the index, in string format. (there can be many IP mapped
+'to one domain name.
+public function ConvertToIPString(bIndex as byte) as string
+	dim sTemp as string
+	dim bIPLen as byte
+	dim bPos as byte
+	if bIndex > bAnsCount then
+		bIndex = 1	
+	end if
+	bPos = instr(1,sIPString,str(bIndex)+":",1)
+	bIPLen = asc(mid(sIPString,bPos + 2,1))
+	sTemp = mid(sIPString,bPos+3,bIPLen)
+	ConvertToIPString = ddstr(sTemp)
+end function

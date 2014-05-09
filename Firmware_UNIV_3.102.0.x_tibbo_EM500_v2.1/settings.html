@@ -1,0 +1,204 @@
+<?
+	include "global.tbh"
+	dim flag as ok_ng
+?>
+
+<html>
+<HEAD>
+<META HTTP-EQUIV="Expires" CONTENT="Tue, 01 Jan 1980 1:00:00 GMT">
+<META HTTP-EQUIV="CACHE-CONTROL" CONTENT="NO-CACHE">
+
+<script type="text/javascript">
+function FormSubmit()
+{
+   alert("Please reboot after saving");
+   document.getElementById("myForm").submit()
+}
+function GetTime()
+{
+  window.top.location.replace("httpcmd.html?opt=gettime&session=<?sock_setsend(SessionID)?>")   
+}
+function IndexPage()
+{
+   window.top.location.replace("Index.html")
+}
+</script>
+
+<style type="text/css">
+body{
+   background-color: #FFFFFF;}
+
+h1,h2,h3,hr{
+   color: #808080;
+   font-family: arial, 'sans serif';    
+   text-align:center;}
+
+table{
+   border:0px;
+   border-spacing: 1px;
+   border-collapse: separate;    
+   font-family: arial, 'sans serif';}
+   
+table.settings{
+   border:0px;
+   border-spacing: 1px;
+   border-collapse: separate;   
+   font-family: arial, 'sans serif';
+   background-color:#EEEEEE; 
+   color: #404040;}   
+
+table.header{
+   border:0px;
+   border-spacing: 1px;
+   border-collapse: separate;  
+   text-align:center;
+   font-family: arial, 'sans serif';
+   background-color:#808080;
+   color: #FFFFFF;} 
+     
+a{
+   float:left;
+   text-decoration:none;
+   color:#FFFFFF;
+   background-color:#FF801C;
+   padding:0.2em 0.6em;}
+
+a:hover {
+   background-color:#808080;}
+  
+</style>
+
+</HEAD>
+
+<body <?flag = html_login_verify(yes)?>>
+<? 
+	if flag = NG then goto finish
+?>
+
+<div>
+<?html_save_setting?>
+<br>
+	<table width='600' align=center>
+		<form id="myForm" action="settings.html?" method="get">
+		<? html_print_session?>	
+		<tr><td width = 80%> <h3> General Settings</h3> </td>
+		</tr>
+		<tr>
+		</tr>
+		<tr>
+			<td width = 80%>
+			<table width= 100% class = 'header'>
+				<tr>
+					<td width= 66%><b>Setting name</b></td>
+					<td width= 34%><b>Setting value</b></td>
+				</tr>
+			</table>		
+			</td>
+			<td>
+			</td>
+		</tr>
+
+		<? html_print_setting("html_config_settings.txt",0) ?>
+		<tr>
+		<td width = 80%>
+			<table width = 100%>
+				<tr><td>
+				    <table>
+					<tr><td><a href = '#' onclick='FormSubmit()'> Save </a></td>
+					 	<td><a href = 'settings.html?session=<?sock_setsend(SessionID)?>'> Reload </a></td>				
+						<td width = 100% align = right></td>
+					</tr>
+					</table>
+					</td>
+				</tr>
+			</table>
+
+			<br />
+			<br />			
+			<table width = 100% class = 'header'>
+				<tr><td><b>Last Time Synchronization</b></td></tr>
+			</table>
+			<table width = 100% class = 'settings'>			
+				<tr><td> 
+				
+				<?
+					dim sTime as string
+					
+					select case wDayOfWeek
+						case 1 
+							sTime = "Date: Monday "
+						case 2 
+							sTime = "Date: Tuesday "
+						case 3 
+							sTime = "Date: Wednesday "
+						case 4 
+							sTime = "Date: Thursday "
+						case 5 
+							sTime = "Date: Friday "							
+						case 6 
+							sTime = "Date: Saturday "	
+						case 7
+							sTime = "Date: Sunday "							
+						case else	
+							sTime = "Date: "	
+					end select
+					
+					sTime = sTime + str(wYears) + "/"
+					
+					if wMonthes<10 then
+					   sTime = sTime + "0"
+					end if					   
+					sTime = sTime + str(wMonthes) + "/"
+					
+					if wDays<10 then
+					   sTime = sTime + "0"
+					end if					   
+					sTime = sTime + str(wDays) + "   "
+					
+					
+					sTime = sTime + "Time: "
+					
+					if wHours<10 then
+					   sTime = sTime + "0"					
+					end if					   
+					sTime = sTime + str(wHours) + ":"
+					
+					if wMinus<10 then
+					   sTime = sTime + "0"						
+					end if					   
+					sTime = sTime + str(wMinus) + ":"
+					
+					if wSeconds<10 then
+					   sTime = sTime + "0"						
+					end if					   
+					sTime = sTime + str(wSeconds) 
+					
+					sock_setsend(sTime)
+				?>
+				
+				</td></tr>
+				<tr><td align=right>next in 
+					<?	dim bh,bm,bs as dword
+						bh = iNtpTimer/7200
+						bm = (iNtpTimer-bh*7200)/120
+						bs = (iNtpTimer-bh*7200-bm*120)/2
+						sock_setsend(str(bh)) ?> hours 
+					<?	sock_setsend(str(bm)) ?> minutes
+					<?	sock_setsend(str(bs)) ?> seconds
+				</td></tr>
+			</table>	
+			
+			<table width = 100%>
+				<tr><td><a href = 'settings.html?session=<?sock_setsend(SessionID)?>' onclick = GetTime()> Synchronize Time Now </a></td></tr>
+			</table>			
+		</td>
+		</tr>
+		</form>
+		
+
+
+		
+</div>
+<? finish: ?>
+</body>
+</html>
