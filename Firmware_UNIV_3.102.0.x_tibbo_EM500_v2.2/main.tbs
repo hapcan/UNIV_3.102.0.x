@@ -1,0 +1,466 @@
+include "global.tbh"
+
+public dim overrun_ser as no_yes									'overrun on serial port
+public dim overrun_eth(16) as no_yes								'overrun on eth ports
+public dim workingmode as boolean									'0-single socket mode, 1-multisocket mode 
+public dim sockets_in_use as byte									'number of sockets used in current mode
+public dim pat_canint as no_yes										'pattern can be interrupted flag
+public dim sNtpServer as string										'NTP server
+public dim bNtpSyncRequest as string								'request for time synchronization flags
+public dim iNtpTimer as dword										'next NTP synchronization timer
+public dim bAutoDayligtSaving as boolean							'NTP auto daylight saving time 0-no or 1-yes
+public dim bSockBlock(16) as boolean								'eth socket feature 0-all msg, 1-bock programming msg
+
+const NTPSYNCTIME = "172800"										'time to next NTP synchronization (in 0.5s)
+'-------------------------------------------------------------------------------
+sub on_sys_init
+
+dim i, timeout as word
+
+	if stg_start()<>EN_STG_STATUS_OK then
+		if stg_restore_multiple(EN_STG_INIT_MODE_NORMAL)<>EN_STG_STATUS_OK then	
+			pat.play("B-R-R-R-**~",PL_PAT_CANINT)					'patern with 4x speed	
+			h1:	goto h1												'boot_failed
+		end if
+	end if	
+
+'PROTECT web access
+SaveSession=random(SessionLEN)										'get unknown key session to meke sure it's not empty	
+
+'NETWORK from settings
+	net.ip=(stg_get("IP",0))
+	net.gatewayip=stg_get("GI",0)
+	net.netmask=stg_get("NM",0)
+	timeout=val(stg_get("CT",0))*120 								'because CT is in mins, property is in 1/2 sec intervals
+	workingmode=val(stg_get("MO",0)) 								'0-single socket mode, 1-multisocket mode 
+	sNameServerIP=stg_get("DNS",0)									'DNS server IP
+	sNtpServer=stg_get("NTP",0)										'NTP server string	
+	bTimeZoneOffSet=val(stg_get("TZ",0))							'NTP time zone offset 0 - 24 (-12h - +12h)
+	bAutoDayligtSaving=val(stg_get("DS",0))							'NTP auto daylight saving time 0-no or 1-yes
+	bSockBlock(2)=val(stg_get("B2",0)) 								'0-all msg, 1-bock programming 	
+	bSockBlock(3)=val(stg_get("B3",0))
+	bSockBlock(4)=val(stg_get("B4",0))
+	bSockBlock(5)=val(stg_get("B5",0))
+	bSockBlock(6)=val(stg_get("B6",0))
+	bSockBlock(7)=val(stg_get("B7",0))
+	bSockBlock(8)=val(stg_get("B8",0))
+	bSockBlock(9)=val(stg_get("B9",0))
+	bSockBlock(10)=val(stg_get("BA",0))
+	bSockBlock(11)=val(stg_get("BB",0))
+	bSockBlock(12)=val(stg_get("BC",0))
+	bSockBlock(13)=val(stg_get("BD",0))
+	bSockBlock(14)=val(stg_get("BE",0))	
+	sock.num=0
+	sock.httpportlist=(stg_get("P0",0))								'http port
+	sock.num=1
+	sock.localportlist=(stg_get("P1",0))
+	sock.num=2
+	sock.localportlist=(stg_get("P2",0))
+	sock.num=3
+	sock.localportlist=(stg_get("P3",0))
+	sock.num=4
+	sock.localportlist=(stg_get("P4",0))
+	sock.num=5
+	sock.localportlist=(stg_get("P5",0))
+	sock.num=6
+	sock.localportlist=(stg_get("P6",0))
+	sock.num=7
+	sock.localportlist=(stg_get("P7",0))
+	sock.num=8
+	sock.localportlist=(stg_get("P8",0))
+	sock.num=9
+	sock.localportlist=(stg_get("P9",0))
+	sock.num=10
+	sock.localportlist=(stg_get("PA",0))
+	sock.num=11
+	sock.localportlist=(stg_get("PB",0))
+	sock.num=12
+	sock.localportlist=(stg_get("PC",0))
+	sock.num=13
+	sock.localportlist=(stg_get("PD",0))
+	sock.num=14
+	sock.localportlist=(stg_get("PE",0))
+	sock.num=15
+	sock.localportlist=(stg_get("PF",0))
+
+	
+'DNS
+	InitDNS															'initialize sock for DNS server connection 
+	DNSQuery(sNtpServer) 											'get IP of NTP Server
+	bNtpSyncRequest="DNS processing"								'set flag
+
+'BUFFERS
+	'alocate ethernet port memory - http socket
+	sock.num=0
+	sock.txbuffrq(2)
+	sock.rxbuffrq(2)
+	sock.varbuffrq(1)
+
+	if workingmode=0 then
+	'single socket mode
+		sockets_in_use=1
+		
+		'allocate serial port memory
+		ser.num=0
+		i=sys.freebuffpages	- 5										'how many buffers available minus 5 for http socket
+		ser.txbuffrq(i/2)
+		
+		'alocate ethernet port memory - com socket
+		sock.num=1
+		sock.txbuffrq(i/2)
+		sys.buffalloc		
+		ser.redir(PL_REDIR_SOCK1)									'serial RX redirect to socket 1 TX
+		sock.redir(PL_REDIR_SER)									'socket 1 RX redirect to serial TX
+	
+	else
+	'multisocket mode
+		sockets_in_use=14
+		
+		'allocate serial port memory
+		ser.num=0
+		ser.txbuffrq(2)
+		ser.rxbuffrq(sys.freebuffpages-21)							'how many buffers available minus 5 for http socket, 2 for ser tx & 14x1 for eth tx
+	
+		'alocate ethernet port memory - com socket
+		for i=1 to sockets_in_use			
+			sock.num=i
+			sock.txbuffrq(1)
+			sock.redir(PL_REDIR_SER)								'redirect socket Rx buffer directly to serial Tx buffer
+		next i
+		sys.buffalloc
+		
+	end if
+	
+	
+	for i=0 to sockets_in_use
+		overrun_eth(i)=NO
+	next i		
+		overrun_ser=NO
+
+		
+'ETHERNET PORT CFG
+	'http socket
+	sock.num=0
+	sock.connectiontout=timeout
+	sock.allowedinterfaces="NET"
+	sock.protocol=PL_SOCK_PROTOCOL_TCP	
+	sock.inconmode=PL_SOCK_INCONMODE_ANY_IP_ANY_PORT
+	sock.reconmode= PL_SOCK_RECONMODE_0
+
+	'eth communication sockets
+	for i=1 to sockets_in_use
+		sock.num=i
+		sock.connectiontout=timeout	
+		sock.allowedinterfaces="NET"		
+		sock.protocol= PL_SOCK_PROTOCOL_TCP
+		sock.inconmode= PL_SOCK_INCONMODE_ANY_IP_ANY_PORT
+		sock.reconmode= PL_SOCK_RECONMODE_2							'reconets from same IP any port
+	next i
+
+'SERIAL CFG
+	ser.baudrate=ser.div9600/(115200/9600)
+	ser.bits=PL_SER_BB_8
+	ser.parity=PL_SER_PR_NONE
+	ser.interface=PL_SER_SI_FULLDUPLEX
+	ser.enabled=YES
+	
+	
+'OTHER
+	quick_init_flag=QI_NULL											'quick init flag
+	iNtpTimer = 20 													'next ntp sync timer in 10s
+	pat_canint=NO 													'this way the pattern below will not be interrupted by sock event	
+	pat.channel=0
+	pat.play(PAT_THREE_BOTH_ONCE, PL_PAT_CANINT)
+
+
+end sub
+
+
+'-------------------------------------------------------------------------------
+sub On_ser_data_arrival
+
+	dim i,iPos as integer
+	dim sData,sBlockedData as string
+	dim wDataLen as word
+	dim bConnection as boolean
+	
+
+	'find sock tx buffer with lowest memory available at the moment in its tx buffer
+	bConnection = false	
+	wDataLen = &hFFFF												'the max length for this variable
+	for i=1 to sockets_in_use
+		sock.num=i
+		if (sock.statesimple = PL_SSTS_EST) then					'check only sockets with established connection
+			bConnection = true		
+			if (wDataLen > sock.txfree) then
+				wDataLen = sock.txfree								'choose the lowest memory
+			end if
+		end if
+	next i
+	if bConnection = false then										'if no socket connected then
+		ser.rxclear													'clear serial buffer
+		exit sub													'and exit subroutine
+	end if
+
+
+	'take maximum data and send to each established socket
+	if (wDataLen>0) then
+		sData = ser.getdata(wDataLen)								'take from serial buffer
+		wDataLen = len(sData)										'data might be shorter
+		
+		'remove programming frames
+		sBlockedData = ""											'all data without programming messages
+		iPos=1
+		for i=1 to wDataLen
+			if asc(mid(sData,i,1)) <> &hAA then						'frame begining?
+				sBlockedData =sBlockedData + mid(sData,i,1)			'no
+			else	
+				if asc(mid(sData,i+14,1)) <> &hA5 then				'frame end?
+					sBlockedData =sBlockedData + mid(sData,i,1)		'no
+				else
+					if asc(mid(sData,i+1,1)) > &h0F then			'programming frame type?
+						sBlockedData = sBlockedData+mid(sData,i,15)	'no
+					end if
+					i = i+14
+				end if
+			end if
+		next i	
+		
+		for i=1 to sockets_in_use
+			sock.num=i
+			if (sock.statesimple = PL_SSTS_EST) then				'check only sockets with established connection
+				if bSockBlock(i) = true then
+					sock.setdata(sBlockedData)
+				else	
+					sock.setdata(sData)
+				end if
+				sock.send
+			end if	
+		next i	
+	end if	
+	
+	
+end sub
+
+'-------------------------------------------------------------------------------
+sub on_sock_event(newstate as pl_sock_state, newstatesimple as pl_sock_state_simple)
+
+	pat.play(PAT_GAP,pat_canint)									'to keep access to on_pat() 
+
+	if html_reboot_flag = YES then 
+		sys.reboot
+	end if
+	
+	if sock.statesimple =PL_SSTS_PC then							'when socket is being closed by other side, reset it immediately to get ready for next opening
+		sock.reset()
+	end if		
+
+end sub
+
+'-------------------------------------------------------------------------------
+sub on_pat()
+
+	dim i as integer
+	pat_canint=YES													'patter that shouldn't have been interrupted just finished playing	
+
+'quick init pattern
+	if quick_init_flag<>QI_NULL then
+		select case quick_init_flag
+		case QI_START:
+			pat.play(PAT_BLINK_BOTH_IN_TURNS,PL_PAT_CANINT)
+		case QI_OK:
+			pat.play(PAT_LONG_GREEN,PL_PAT_CANINT)
+			quick_init_flag=QI_END
+		case QI_NG:
+			pat.play(PAT_LONG_RED,PL_PAT_CANINT)
+			quick_init_flag=QI_END
+		case QI_END:
+			sys.reboot			
+		end select
+		exit sub
+	end if
+
+'ethernet pattern
+	for i=0 to sockets_in_use
+		sock.num=i
+		select case sock.statesimple
+		case PL_SSTS_CLOSED, PL_SSTS_PC, PL_SSTS_AC:				'no connection at this time
+			select case sock.state
+			case PL_SST_CL_PRESET_POPENING,							'connection was reset by the other end
+				 PL_SST_CL_PRESET_AOPENING,
+				 PL_SST_CL_PRESET_EST,
+				 PL_SST_CL_PRESET_PCLOSING,
+				 PL_SST_CL_PRESET_ACLOSING,
+				 PL_SST_CL_PRESET_STRANGE:
+
+				 pat.play(PAT_THREE_SHORT_RED,PL_PAT_CANINT)
+			case else:												'idle (and not because it was reset by other end)
+				 pat.play(PAT_TWO_SHORT_GREEN,PL_PAT_CANINT)
+			end select
+			
+		case PL_SSTS_PO, PL_SSTS_AO:
+			pat.play(PAT_THREE_SHORT_GREEN,PL_PAT_CANINT)
+		
+		case PL_SSTS_EST:
+			pat.play(PAT_GREEN_LOOP,PL_PAT_CANINT) 		
+			exit sub												'exit if one connection is established
+		end select
+	next i			
+
+end sub
+
+'-------------------------------------------------------------------------------
+sub on_sys_timer()													'occurs every 0.5s
+
+	dim i as integer
+	
+	'blink when data is received on any socket
+	for i=0 to sockets_in_use
+		sock.num=i
+		if sock.statesimple=PL_SSTS_EST and sock.toutcounter=0 then	'socket in use?
+			pat.play(PAT_GAP,pat_canint)							'so, short blink
+			exit sub												'exit if one connection is established
+		end if
+	next i
+	
+	'NTP request timer
+	if iNtpTimer=0 then												'time for next NTP synchronization?
+		bNtpSyncRequest="Get Time"									'NTP synchronization request	
+	else
+		iNtpTimer=iNtpTimer-1
+	end if
+	
+	'NTP request
+	if bNtpSyncRequest="Get Time" then								'NTP synchronization request
+		ConnectToTimeServer(ConvertToIPString(1),"")				'ConnectToTimeServer(IP,Port) leave Port as "" for default value port 123
+		SNTPQuery													'Query for Time	
+		iNtpTimer = NTPSYNCTIME										'time to next NTP synchronization
+		bNtpSyncRequest="NTP processing"							'set flag 
+	end if	
+	
+end sub
+
+'-------------------------------------------------------------------------------
+sub on_sock_overrun()
+	dim i as byte
+	
+	for i=0 to sockets_in_use
+		if i=sock.num then
+			overrun_eth(i)=YES										'put overrun flag on particular socket
+		end if
+	next i
+end sub
+
+'-------------------------------------------------------------------------------
+sub on_ser_overrun()
+	overrun_ser=YES
+end sub
+
+'-------------------------------------------------------------------------------
+sub on_button_pressed()												'reset to factory settings
+
+	dim stg_op_result as en_stg_status_codes
+	dim i,j as word
+
+	if quick_init_flag=QI_NULL then
+		quick_init_flag=QI_START
+		
+	else
+		'init already started
+		'now, button has to be kept released for a while first
+		if button.time<10 then exit sub
+		
+		'now we need to wait for a while -- the button must be "long-pressed"
+		i=sys.timercount
+		while button.pressed=YES
+			j=sys.timercount
+			'the code below takes into the account that the sys.timercount can wrap around
+			if j>=i then
+				if j-i>=BUTTON_CONST_QUICK_INIT then
+					goto initialize
+				end if
+			else
+				if  (65536-i)+j>=BUTTON_CONST_QUICK_INIT then
+initialize:			'OK, initialize now!
+					pat.play(PAT_GAP,PL_PAT_CANINT)
+					if stg_restore_multiple(EN_STG_INIT_MODE_OVERRIDE)<>EN_STG_STATUS_OK then
+						quick_init_flag=QI_NG
+					else
+						quick_init_flag=QI_OK
+					end if	
+					exit sub
+				end if
+			end if
+			doevents 
+		wend
+	end if
+end sub
+
+'-------------------------------------------------------------------------------
+sub on_sock_data_arrival()
+
+	if sock.num = 15 then
+		select case bNtpSyncRequest
+			case "DNS processing"									'DNS response
+				ExtractFromRXBuff 									'Extract IP data from DNS sock rx buffer  
+				bNtpSyncRequest="idle"								'clear flag				
+			case "NTP processing"									'NTP response
+				GetTime												'Extract Internet time in SNTP sock rx buffer
+				AddDaylightSavingTime
+				bNtpSyncRequest="idle"								'clear flag				
+				SendTimeToRTC
+		end select	
+	end if		
+	
+end sub
+
+'-------------------------------------------------------------------------------
+sub	AddDaylightSavingTime()
+	if bAutoDayligtSaving = true then
+		if IsDaylightSavingTime = true then
+			wHours = wHours+1										'add hour
+			wSavedDays = wSavedDays + wHours/24						'does it change days?
+			wHours = wHours - wHours/24*24							'so, update hours
+			wDays = wSavedDays										'ConvertDates uses wDays as input value
+			ConvertDates											'call convertDates to calculate date again with included DST
+		end if
+	end if	
+end sub
+
+'-------------------------------------------------------------------------------
+sub SendTimeToRTC
+
+	if ser.txfree >26 then
+		dim sTime,sDate as string
+		dim bYears,bMonthes,bDays,bHours,bMinus,bSeconds,bChecksum as byte	
+		
+		bYears = Dec2Bcd(wYears-2000)
+		bMonthes = Dec2Bcd(wMonthes)		
+		bDays = Dec2Bcd(wDays)
+		bHours = Dec2Bcd(wHours)
+		bMinus = Dec2Bcd(wMinus)
+		bSeconds = Dec2Bcd(wSeconds)
+		
+		'send time
+		bChecksum = 176+bHours+bMinus+bSeconds
+		sTime = "\xAA\x10\xA0\x00"+chr(bHours)+chr(bMinus)+chr(bSeconds)+"\x00\x00\x00\x00"+chr(bChecksum)+"\xA5"
+		ser.setdata(sTime)
+		ser.send
+		
+		'send date
+		bChecksum = 177+bYears+bMonthes+bDays+wDayOfWeek
+		sDate = "\xAA\x10\xA0\x01"+chr(bYears)+chr(bMonthes)+chr(bDays)+chr(wDayOfWeek)+"\x00\x00\x00"+chr(bChecksum)+"\xA5"
+		ser.setdata(sDate)
+		ser.send
+	end if
+	
+end sub
+
+'-------------------------------------------------------------------------------
+function Dec2Bcd(dec as byte) as byte								'converts decimal value into BCD eg 17 -> 0x17
+	dim bcd as byte
+	bcd = (dec/10)*16+(dec-(dec/10*10))
+	Dec2Bcd = bcd
+end function
+
+	
