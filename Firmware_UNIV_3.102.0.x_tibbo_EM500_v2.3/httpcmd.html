@@ -1,0 +1,29 @@
+<?
+	include "global.tbh"
+	dim flag as ok_ng
+	
+?>
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD W3 HTML//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Expires" CONTENT="Tue, 01 Jan 1980 1:00:00 GMT">
+<META HTTP-EQUIV="CACHE-CONTROL" CONTENT="NO-CACHE">
+<script type="text/javascript">
+function IndexPage()
+  {
+  window.top.location.replace("index.html")
+  }
+  
+function HomePage()
+  {
+  window.top.location.replace("home.html?session=<?sock_setsend(SessionID)?>")  
+  }
+ 
+</script>
+</HEAD>
+
+<body <?flag = html_login_verify(yes)
+if flag =OK then html_proc_cmd?>>
+
+</body>
+</HTML>

@@ -1,0 +1,4 @@
+
+declare sub html_save_setting
+declare sub html_print_setting(html_descr_file as string(30),config_data as word)
+CONST MAX_HTML_NUM_SETTINGS = STG_MAX_NUM_SETTINGS+2

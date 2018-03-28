@@ -1,0 +1,291 @@
+'***********************************************************************************************************
+'			 SNTP LIBARAY (SIMPLE NETWORK TIME PROTOCOL) THIS CODE CAN OBTAIN TIME FROM SNTP SERVER
+'***********************************************************************************************************
+'IP for some of the Time Servers changes sometimes, so we suggest using DNS to obtain your Time Server IP.
+'When the Query is sent to the Time Server, Server returns the amount of seconds from 1st Jan, 1900 00:00:00
+'to now.  This is called 64bits Timestamp format
+'***********************************************************************************************************
+include "SNTP.tbh"
+
+const SNTPSOCK = "15"		'<------------------- sock number for SNTP, change this according to your program
+
+public dim bTimeZoneOffSet as byte				'time zone offset 0 - 24 (-12h - +12h)
+public dim wYears as word		
+public dim wMonthes as word		
+public dim wDays as word
+public dim wSavedDays as word
+public dim wDayOfWeek as word
+public dim wHours as word
+public dim wMinus as word
+public dim wSeconds as word
+'------------------------------------------------------------------------------------------------------------
+'Initialize the sock for SNTP connection
+public sub InitSNTP	
+	sock.num = val(SNTPSOCK)
+	sock.txbuffrq(1)
+	sock.rxbuffrq(1)
+	sys.buffalloc
+	sock.protocol = PL_SOCK_PROTOCOL_UDP
+	sock.inconmode = PL_SOCK_INCONMODE_ANY_IP_ANY_PORT
+	sock.reconmode=PL_SOCK_RECONMODE_3
+end sub
+'------------------------------------------------------------------------------------------------------------
+'Connect to SNTP Time Server specified by sTimeServerIP, the port 123 is the default value for time server
+public function ConnectToTimeServer(sTimeServerIP as string, sTimeServerPort as string) as byte
+	sock.num = val(SNTPSOCK)
+	if sTimeServerPort = "" then
+		sock.targetport = 123
+	else
+		sock.targetport = val(sTimeServerPort)' 123 port is a common port for time server
+	end if
+	sock.targetip = sTimeServerIP 
+	sock.connect
+end function
+'------------------------------------------------------------------------------------------------------------
+'the Mod function
+function fMod(wDivident as word, wDivisor as word) as byte
+	dim wTemp as word
+	wTemp = wDivident/wDivisor
+	fMod = wDivident - wTemp*wDivisor 
+end function
+'------------------------------------------------------------------------------------------------------------
+'Calculate how many days a year by the Leap Year Rule
+function ConvertDates as byte
+	dim i as byte 
+	dim bLeapYear as byte
+	dim wDaysOfAYear as word
+	dim wDaysOfAMonth as word
+	dim bDone as byte
+	bDone = 0
+	wYears = 1900				'the base year is 1900
+	wMonthes = 1				'the base month is January
+	wDaysOfAYear = 365
+	wDaysOfAMonth = 31
+	wDayOfWeek = fMod(wDays,7)
+	if wDayOfWeek=0 then		'1-Mo, 2-Tu, 3-We, 4-Th, 5-Fr, 6-Sa, 7-Su
+		wDayOfWeek=7
+	end if
+	do while wDays > 0	' wDaysOfAYear
+		if fMod(wYears,4) = 0 then
+			bLeapYear = 1
+			wDaysOfAYear = 366
+		else
+			wDaysOfAYear = 365
+			bLeapYear = 0
+		end if
+		if fMod(wYears, 100) = 0 then
+			wDaysOfAYear = 365
+			bLeapYear = 0
+		end if
+		if fMod(wYears, 400) = 0 then
+			wDaysOfAYear = 366
+			bLeapYear = 1
+		end if
+		
+		if wDays >= wDaysOfAYear then
+			wYears = wYears + 1
+			wDays = wDays - wDaysOfAYear
+		else
+			goto exit1
+		end if
+	loop
+
+exit1:
+	do while bDone = 0
+		select case wMonthes
+			case 1,3, 5, 7, 8, 10:
+			wDaysOfAMonth = 31
+			case 4, 6, 9, 11:
+			wDaysOfAMonth = 30
+			case 2:
+			if bLeapYear = 1 then
+				wDaysOfAMonth = 29
+			else
+				wDaysOfAMonth = 28	
+			end if
+		end select
+		if wDays > wDaysOfAMonth then
+			wMonthes = wMonthes + 1
+			wDays = wDays - wDaysOfAMonth
+		else
+			bDone = 1
+		end if
+	loop
+end function
+'------------------------------------------------------------------------------------------------------------
+'Take 4 bytes value from sock, which is the amount of seconds from 1st of Jan 1900 00:00:00 to now
+'convert this value into days,hours,mins,secs. 
+function ConvertToTime(wMSW as word, wLSW as word) as byte
+	dim wRemain as word
+	dim wFactor as word
+	dim wTemp as word
+	dim wTemp1 as word
+	dim wTemp2 as word
+	dim wTemp3 as word	
+	dim i as integer
+	dim j as integer
+		
+	wRemain = 0
+	wFactor = 0
+	wDays = 0
+	wHours = 0
+	wMinus = 0
+	wSeconds = 0
+	wTemp1 = 0
+	wTemp2 = 0
+	wTemp3 = 0
+
+	wRemain = fMod(wMSW, 24)
+	wFactor = wMSW/24
+	wDays = wFactor * 18
+	wTemp1 = 0
+	 
+	for i = 1 to wFactor
+		wTemp1 = wTemp1 + 736
+		if wTemp1 > 3600 then 
+			wDays = wDays + 1
+			wTemp1 = wTemp1 - 3600
+		end if
+	next i 
+	for j = 1 to 18
+		wTemp2 = wTemp2 + wRemain
+		if wTemp2 > 24 then
+			wDays = wDays + 1
+			wTemp2 = wTemp2 -24
+		end if
+	next j
+	
+	'Put wTemp1 into Minus and Seconds
+	wTemp3 = wRemain * 736
+	wTemp = wTemp1/60
+	wMinus = wTemp * 24
+	
+	'put wTemp2 into Minus and Seconds
+	wSeconds = fMod(wTemp1, 60) * 24
+	wMinus = wMinus + wTemp2 * 60
+	
+	'put wTemp3 into Minus and Seconds
+	wMinus = wMinus + wTemp3/60
+	wSeconds = wSeconds + fMod(wTemp3, 60) 
+	
+	'Add wLSW to minus and seconds
+	wMinus = wMinus + wLSW/60
+	wSeconds = wSeconds + fMod(wLSW , 60)
+	
+	'redistribute seconds to days.
+	wMinus = wMinus + wSeconds/60
+	wSeconds = fMod(wSeconds, 60)	
+	wHours = wMinus/60
+	
+	'Off set the hours according to TimeZoneOffSet constant, which should be changed by user according the 
+	'user's timez zone
+	wHours = wHours - 12 + bTimeZoneOffSet	'NTP time zone offset 0 - 24 (-12h - +12h)
+	
+	wMinus = fMod(wMinus, 60)	
+	wDays = wDays + wHours/24
+	wDays = wDays + 1 			'+1 because it counts start from 1st of January, (that is starting from 1)
+	wHours = fMod(wHours, 24)
+	wSavedDays = wDays			'save number of days	
+end function
+'------------------------------------------------------------------------------------------------------------
+'send query for time base to the time server
+public function SNTPQuery as byte
+	dim s as string
+	dim i as byte
+	sock.num = val(SNTPSOCK)
+	s = chr(&h0b)
+	for i = 1 to 47
+		s = s + chr(&h0)
+	next i
+	sock.setdata(s)
+	sock.send
+end function
+'------------------------------------------------------------------------------------------------------------
+'extract the time from the rx buff
+public function GetTime as byte
+	sock.num = val(SNTPSOCK)
+	dim wMSW as word
+	dim wLSW as word
+	dim b1 as byte
+	dim b2 as byte
+	dim b3 as byte
+	dim b4 as byte
+	dim s as string
+	s = sock.getdata(255)
+	sock.close
+	b1 = asc(mid(s,41,1)) 'the time is in a 4 byte format, (64bits Timestamp format)
+	b2 = asc(mid(s,42,1))
+	b3 = asc(mid(s,43,1))
+	b4 = asc(mid(s,44,1))
+	wMSW = b1 * 256 + b2
+	wLSW = b3 * 256 + b4
+	ConvertToTime(wMSW, wLSW)		'call ConvertToTime, to convert the 64bits timestamp into days, hours, mins,and secs
+	ConvertDates					'call convertDates to calculate the years, and monthes following the leap year rule.
+end function
+
+'-------------------------------------------------------------------------------
+function IsDaylightSavingTime as boolean						'DST is from 2am on last Sunday in March till 2am on last Sunday in October
+
+	dim bDST as boolean
+	
+	'months between March and October
+	if wMonthes > 3 then
+		if wMonthes < 10 then
+			bDST = true												
+		end if
+	end if	
+	
+	'months before March and after October
+	if wMonthes < 3 then
+		bDST = false	
+	end if	
+	if wMonthes > 10 then
+		bDST = false												
+	end if
+	
+	'in March
+	if wMonthes = 3 then											
+		if wDays >24 then											'days after 24th March
+			if wDayOfWeek = 7 then									'if Sunday
+				if wHours < 2 then
+					bDST = false									'before 2am
+				else
+					bDST = true
+				end if
+			else													'other days than Sunday
+				if wDays-wDayOfWeek < 25 then
+					bDST = false									'Sunday ahead
+				else
+					bDST = true										'Sunday passed
+				end if
+			end if
+		else
+			bDST = false											'days before 25th March
+		end if
+	end if
+
+	'in October
+	if wMonthes = 10 then											
+		if wDays >24 then											'days after 24th October
+			if wDayOfWeek = 7 then									'if Sunday
+				if wHours < 2 then
+					bDST = true										'before 2am
+				else
+					bDST = false
+				end if
+			else													'other days than Sunday
+				if wDays-wDayOfWeek < 25 then
+					bDST = true										'Sunday ahead
+				else
+					bDST = false									'Sunday passed
+				end if
+			end if
+		else
+			bDST = true												'days before 25th October
+		end if
+	end if
+	
+	IsDaylightSavingTime = bDST
+	
+end function
+

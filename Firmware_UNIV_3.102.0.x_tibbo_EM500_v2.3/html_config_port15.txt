@@ -1,0 +1,42 @@
+bit0	multi-port configuration
+bit1	multi-channel configuration
+bit2	Power on pin 9 available
+bit3	Wi-Fi available
+bit4	GPRS available
+bit5	serial port modes are 232, 485, and 422
+bit6	serial port modes are full-duplex and half-duples
+bit7	serial port supports baudrates up to 115200	
+bit8	serial port supports all baudrates
+
+bits876543210
+
+>>&b000000000	CT	Connection Timeout [min]						S,I,2	^
+>>&b000000000	MO	Working Mode 									B,L,0-Single Socket Mode;1-Multi Socket Mode;	^
+>>&b000000000	P0	Web Port										S,I,5	^
+>>&b000000000	P1	<b>Socket 1</b> - Port 							S,I,5	^
+>>&b000000000	P2	<b>Socket 2</b> - Port							S,I,5	^
+>>&b000000000	B2	- Block programming messages					B,L,0-No;1-Yes;	^
+>>&b000000000	P3	<b>Socket 3</b> - Port							S,I,5	^
+>>&b000000000	B3	- Block programming messages					B,L,0-No;1-Yes;	^
+>>&b000000000	P4	<b>Socket 4</b> - Port							S,I,5	^
+>>&b000000000	B4	- Block programming messages					B,L,0-No;1-Yes;	^
+>>&b000000000	P5	<b>Socket 5</b> - Port							S,I,5	^
+>>&b000000000	B5	- Block programming messages					B,L,0-No;1-Yes;	^
+>>&b000000000	P6	<b>Socket 6</b> - Port							S,I,5	^
+>>&b000000000	B6	- Block programming messages					B,L,0-No;1-Yes;	^
+>>&b000000000	P7	<b>Socket 7</b> - Port							S,I,5	^
+>>&b000000000	B7	- Block programming messages					B,L,0-No;1-Yes;	^
+>>&b000000000	P8	<b>Socket 8</b> - Port							S,I,5	^
+>>&b000000000	B8	- Block programming messages					B,L,0-No;1-Yes;	^
+>>&b000000000	P9	<b>Socket 9</b> - Port							S,I,5	^
+>>&b000000000	B9	- Block programming messages					B,L,0-No;1-Yes;	^
+>>&b000000000	PA	<b>Socket 10</b> - Port							S,I,5	^
+>>&b000000000	BA	- Block programming messages					B,L,0-No;1-Yes;	^
+>>&b000000000	PB	<b>Socket 11</b> - Port							S,I,5	^
+>>&b000000000	BB	- Block programming messages					B,L,0-No;1-Yes;	^
+>>&b000000000	PC	<b>Socket 12</b> - Port							S,I,5	^
+>>&b000000000	BC	 Block programming messages						B,L,0-No;1-Yes;	^
+>>&b000000000	PD	<b>Socket 13</b> - Port							S,I,5	^
+>>&b000000000	BD	- Block programming messages					B,L,0-No;1-Yes;	^
+>>&b000000000	PE	<b>Socket 14</b> - Port							S,I,5	^
+>>&b000000000	BE	- Block programming messages					B,L,0-No;1-Yes;	^

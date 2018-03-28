@@ -1,0 +1,15 @@
+declare function ConnectToTimeServer(sTimeServerIP as string, sTimeServerPort as string) as byte
+declare function GetTime as byte
+declare function ConvertDates as byte
+declare function SNTPQuery as byte
+declare sub InitSNTP 
+declare sub AddDaylightSavingTime
+declare function IsDaylightSavingTime as boolean
+declare wYears as word
+declare wMonthes as word
+declare wDays as word
+declare wSavedDays as word
+declare wDayOfWeek as word
+declare wHours as word
+declare wMinus as word
+declare wSeconds as word

@@ -1,0 +1,44 @@
+includepp "settings.xtxt"
+include "settings\trunk\settings.tbh"
+include "sock\trunk\sock.tbh"
+include "device.tbh"
+include "html_setting.tbh"
+include "html_common.tbh"
+include "DNS.tbh"
+include "SNTP.tbh"
+
+'DECLARATIONS--------------------------------------------------------
+
+CONST FIRMWARE_VERSION="UNIV 3.102.0.x - Tibbo EM500 - v2.3 "
+CONST SessionLEN = 8
+
+CONST HTML_CONFIRM_LOG_OFF = "Would you like to log out?"
+CONST HTML_CONFIRM_INITIALIZE = "Would you like to initialize the device? \\nSome of the settings will only be effective after reboot!"
+CONST HTML_CONFIRM_REBOOT = "Would you like to reboot the device? \\nIP address of the device might change after reboot!"
+CONST HTML_LOGGED_OUT = "<b>Logged out.</b>"
+CONST HTML_INVALID_LOGIN = "<b>Invalid password. Please try again.</b>"
+CONST HTML_INVALID_SESSION = "<b>Invalid session ID, or other user is currently logged in, please log in again.</b>"
+CONST HTML_NO_PRIORITY = "<b>Another user is currently logged in from a client with higher priority.</b>"
+CONST HTML_NOT_LOGGED_IN = "<b>You are not logged in. This could be because your login session has expired OR because another session with higher priority has started</b>"
+
+'ASCII for special characters
+const TAB=9
+const LF=10
+const CR=13
+const STX=2
+const ETX=3
+
+
+declare html_reboot_flag as no_yes
+declare workingmode as boolean								'0-single socket mode, 1-multisocket mode 
+declare sockets_in_use as byte								'number of sockets used in current mode
+declare SessionID as string(SessionLEN)
+declare SaveSession as string(SessionLEN)
+declare bNtpSyncRequest as string							'request for time synchronization flags
+declare bTimeZoneOffSet as byte								'time zone offset 0 - 24 (-12h - +12h)
+declare bAutoDayligtSaving as boolean						'NTP auto daylight saving time 0-no or 1-yes
+declare iNtpTimer as dword									'time to next NTP synchronization
+
+declare sub SendTimeToRTC
+declare function Dec2Bcd(dec as byte) as byte
+

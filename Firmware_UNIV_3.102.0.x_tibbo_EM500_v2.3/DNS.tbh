@@ -1,0 +1,6 @@
+declare sNameServerIP as string
+declare bAnsCount as byte
+declare sub InitDNS
+declare function DNSQuery(sQueryName as string) as string
+declare function ExtractFromRXBuff as byte
+declare function ConvertToIPString(bIndex as byte) as string
