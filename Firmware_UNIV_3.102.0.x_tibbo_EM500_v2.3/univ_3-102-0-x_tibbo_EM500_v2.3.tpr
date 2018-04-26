@@ -2,7 +2,7 @@
 version=1
 platform=EM500W
 src_lib_ver=2_01_00
-name=univ_3-102-0-x_tibbo_EM500_v2.1
+name=univ_3-102-0-x_tibbo_EM500_v2.3
 output=univ_3-102-0-x_tibbo_EM500_v2.3.tpc
 debug=off
 defines=/dOBJECT_FD=FD_ENABLED /dLCD_TYPE=SAMSUNG_S6B0108 /dOBJECT_LCD=LCD_ENABLED /dOBJECT_KP=KP_ENABLED
